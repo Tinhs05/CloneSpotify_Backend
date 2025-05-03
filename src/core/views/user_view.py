@@ -17,7 +17,6 @@ import random
 import string
 from django.core.mail import send_mail
 from django.conf import settings
-from django.contrib.auth.hashers import make_password, check_password
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
@@ -64,20 +63,15 @@ class UserViewSet(viewsets.ModelViewSet):
                 'error': 'Please provide both username and password'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            user = User.objects.get(username=username)
-            # Kiểm tra password bằng check_password
-            if check_password(password, user.password):
-                refresh = RefreshToken.for_user(user)
-                serializer = self.get_serializer(user)
-                return Response({
-                    'user': serializer.data,
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                })
-        except User.DoesNotExist:
-            pass
-
+        user = authenticate(username=username, password=password)
+        if user:
+            refresh = RefreshToken.for_user(user)
+            serializer = self.get_serializer(user)
+            return Response({
+                'user': serializer.data,
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            })
         return Response({
             'error': 'Invalid credentials'
         }, status=status.HTTP_401_UNAUTHORIZED)
