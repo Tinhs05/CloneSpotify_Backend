@@ -2,7 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
-from django.contrib.auth import authenticate
+from django.contrib.auth.hashers import make_password, check_password
 from rest_framework_simplejwt.tokens import RefreshToken
 from ..models.user import User
 from ..serializers.user_serializer import (
@@ -43,6 +43,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 user = serializer.save()
                 refresh = RefreshToken.for_user(user)
                 return Response({
+                    'success': True,
                     'user': UserSerializer(user).data,
                     'refresh': str(refresh),
                     'access': str(refresh.access_token),
@@ -63,8 +64,15 @@ class UserViewSet(viewsets.ModelViewSet):
                 'error': 'Please provide both username and password'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        user = authenticate(username=username, password=password)
-        if user:
+
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response({
+                'error': 'Invalid credentials'
+            }, status=status.HTTP_200_OK)
+        
+        if check_password(password, user.password):
             refresh = RefreshToken.for_user(user)
             serializer = self.get_serializer(user)
             return Response({
@@ -72,9 +80,10 @@ class UserViewSet(viewsets.ModelViewSet):
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             })
-        return Response({
-            'error': 'Invalid credentials'
-        }, status=status.HTTP_401_UNAUTHORIZED)
+        else:
+            return Response({
+                'error': 'Invalid credentials'
+            }, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'])
     def request_password_reset(self, request):
@@ -161,7 +170,7 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['put'])
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny])
     def update_premium_status(self, request, pk=None):
         user = self.get_object()
         is_premium = request.data.get('is_premium')
@@ -169,7 +178,10 @@ class UserViewSet(viewsets.ModelViewSet):
             user.is_premium = is_premium
             user.save()
             serializer = self.get_serializer(user)
-            return Response(serializer.data)
+            return Response({
+                'success': True,
+                'user': serializer.data
+            })
         return Response({
             'error': 'is_premium field is required'
         }, status=status.HTTP_400_BAD_REQUEST)
