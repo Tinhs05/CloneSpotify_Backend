@@ -8,7 +8,7 @@ class User(models.Model):
     password = models.CharField(max_length=128)
     profile_image_path = models.CharField(max_length=255, blank=True, null=True)
     is_premium = models.IntegerField(default=0)
-    role = models.IntegerField(default=0)
+    role = models.IntegerField(default=0)  # 0 = user thường, 1 = admin
 
     class Meta:
         app_label = 'core'
